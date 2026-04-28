@@ -19,10 +19,12 @@ interface RowspanSlot {
 function stripTemplates(s: string): string {
 	let prev = '';
 	let current = s;
+
 	while (current !== prev) {
 		prev = current;
 		current = current.replace(/\{\{[^{}]*\}\}/g, '');
 	}
+
 	return current;
 }
 
@@ -74,13 +76,16 @@ function parseCell(cellContent: string): CellParseResult {
 			i++;
 		} else if (ch === '|' && braceDepth === 0 && bracketDepth === 0) {
 			const before = cellContent.slice(0, i).trim();
+
 			if (isAttrString(before)) {
 				const value = cellContent.slice(i + 1).trim();
 				const rowspanMatch = /rowspan="(\d+)"/.exec(before);
 				const rowspan =
 					rowspanMatch !== null && rowspanMatch[1] !== undefined ? Number.parseInt(rowspanMatch[1], 10) : 1;
+
 				return { value, rowspan };
 			}
+			
 			break;
 		}
 	}
@@ -90,17 +95,22 @@ function parseCell(cellContent: string): CellParseResult {
 
 function parseCoordinates(cell: string): { x: number; y: number; z: number } | null {
 	const trimmed = cell.trim();
+
 	if (!trimmed) return null;
+
 	// Multiple coordinate sets joined by <br> → treat as missing
 	if (/<br/i.test(trimmed)) return null;
+
 	// Uncertain coordinates marked with ? → treat as missing
 	if (trimmed.includes('?')) return null;
 
 	const s = trimmed.replace(/[()]/g, '').replace(/,/g, ' ');
 	const tokens = s.split(/\s+/).filter((t) => t !== '');
+
 	if (tokens.length !== 3) return null;
 
 	const nums = tokens.map(Number);
+
 	if (nums.some((n) => Number.isNaN(n) || !Number.isFinite(n))) return null;
 
 	// Length already verified as 3; indexed access is number (no noUncheckedIndexedAccess)
@@ -113,11 +123,16 @@ function parseItemNumber(cell: string): number | null {
 	s = s.replace(/\[\[([^\]]*)\]\]/g, '$1');
 
 	const m = /(\d+)(\+)?/.exec(s);
+
 	if (m === null) return null;
+
 	// Indeterminate count like "60+" → no number
 	if (m[2] === '+') return null;
+
 	const digits = m[1];
+
 	if (digits === undefined) return null;
+
 	return Number.parseInt(digits, 10);
 }
 
@@ -174,12 +189,14 @@ function processRow(
 	const notesCell = columns[4] ?? '';
 
 	const notesStripped = stripWikitext(notesCell);
+
 	if (/no longer available/i.test(notesStripped)) return;
 
 	const num = parseItemNumber(numberCell);
 	const name = num !== null ? `${itemName} ${num}` : itemName;
 
 	const coords = parseCoordinates(coordsCell);
+
 	if (coords !== null) {
 		result.complete.push({
 			name,
@@ -193,6 +210,7 @@ function processRow(
 
 	// No valid coordinates → incomplete waypoint
 	const territoryStripped = stripWikitext(territory).trim();
+
 	// Skip rows where territory is empty or a bare hyphen (placeholder)
 	if (!territoryStripped || territoryStripped === '-') return;
 
@@ -218,16 +236,21 @@ function parseTable(tableContent: string, itemName: string, icon: WaypointIcon, 
 
 	for (const line of tableContent.split('\n')) {
 		const trimmed = line.trim();
+
 		if (!trimmed || trimmed.startsWith('{|')) continue;
+
 		if (trimmed.startsWith('|}')) {
 			finalizeRow();
 			continue;
 		}
+
 		if (trimmed.startsWith('|+') || trimmed.startsWith('!')) continue;
+
 		if (trimmed.startsWith('|-')) {
 			finalizeRow();
 			continue;
 		}
+
 		if (trimmed.startsWith('|')) {
 			pendingCells.push(parseCell(trimmed.slice(1)));
 		}
@@ -250,13 +273,18 @@ export function parseFile(content: string, icon: WaypointIcon): ParseResult {
 	for (const section of rawTabber.split(/^\s*\|-\|\s*$/m)) {
 		// Section header: first line matching "ItemName="
 		const nameMatch = /^([^=\n]+?)=\s*$/m.exec(section);
+
 		if (nameMatch === null) continue;
+
 		const rawName = nameMatch[1];
+
 		if (rawName === undefined) continue;
+
 		const itemName = rawName.trim().toLowerCase();
 
 		const tableStart = section.indexOf('{|');
 		const tableEnd = section.lastIndexOf('|}');
+
 		if (tableStart === -1 || tableEnd === -1) continue;
 
 		parseTable(section.slice(tableStart, tableEnd + 2), itemName, icon, result);

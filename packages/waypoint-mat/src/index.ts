@@ -18,9 +18,11 @@ const allComplete: Waypoint[] = [];
 const allIncomplete: WaypointIncomplete[] = [];
 
 const files = await readdir(dataDir);
+
 for (const file of files.filter((f) => f.endsWith('.txt'))) {
 	const stem = file.slice(0, -4);
 	const icon = iconMap[stem];
+
 	if (icon === undefined) continue;
 
 	const content = await readFile(resolve(dataDir, file), 'utf-8');
