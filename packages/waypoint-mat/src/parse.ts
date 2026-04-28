@@ -130,7 +130,6 @@ function parseItemNumber(cell: string): number | null {
 	if (m[2] === '+') return null;
 
 	const digits = m[1];
-
 	if (digits === undefined) return null;
 
 	return Number.parseInt(digits, 10);
@@ -166,10 +165,13 @@ function processRow(
 				// Explicit cell overrides the rowspan; clear the stale rowspan state
 				slot.remaining = 0;
 			}
+
 			const cell = cells[cellIdx];
+
 			if (cell !== undefined) {
 				cellIdx++;
 				columns.push(cell.value);
+
 				if (cell.rowspan > 1 && slot !== undefined && !isOverflowRow) {
 					slot.value = cell.value;
 					slot.remaining = cell.rowspan - 1;
@@ -221,7 +223,9 @@ function processRow(
 		visibility: 'default',
 		territory: territoryStripped,
 	};
+
 	if (notesStripped) entry.notes = notesStripped;
+
 	result.incomplete.push(entry);
 }
 
@@ -273,11 +277,9 @@ export function parseFile(content: string, icon: WaypointIcon): ParseResult {
 	for (const section of rawTabber.split(/^\s*\|-\|\s*$/m)) {
 		// Section header: first line matching "ItemName="
 		const nameMatch = /^([^=\n]+?)=\s*$/m.exec(section);
-
 		if (nameMatch === null) continue;
 
 		const rawName = nameMatch[1];
-
 		if (rawName === undefined) continue;
 
 		const itemName = rawName.trim().toLowerCase();
