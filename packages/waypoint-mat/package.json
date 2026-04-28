@@ -1,0 +1,19 @@
+{
+	"name": "waypoint-mat",
+	"version": "1.0.0",
+	"description": "",
+	"type": "module",
+	"scripts": {
+		"start": "tsx src/index.ts",
+		"format": "biome check . --write",
+		"build": "tsc",
+		"typecheck": "tsc --noEmit"
+	},
+	"packageManager": "pnpm@10.33.2",
+	"devDependencies": {
+		"@biomejs/biome": "catalog:",
+		"@types/node": "catalog:",
+		"tsx": "catalog:",
+		"typescript": "catalog:"
+	}
+}
