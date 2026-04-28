@@ -85,7 +85,7 @@ function parseCell(cellContent: string): CellParseResult {
 
 				return { value, rowspan };
 			}
-			
+
 			break;
 		}
 	}
