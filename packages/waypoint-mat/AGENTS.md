@@ -134,3 +134,36 @@ if (notesStripped) entry.notes = notesStripped;
 
 result.incomplete.push(entry);
 ```
+
+**Bad**
+
+```ts
+const itemName = parseItemName($, tab);
+
+if (!itemName) return;
+
+const contentBlock = contentBlocks.eq(index);
+
+if (contentBlock.length === 0) return;
+
+const table = contentBlock.find('table.wikitable').first();
+
+if (table.length === 0) return;
+
+parseTable($, table, itemName, icon, result);
+```
+
+**Good**
+
+```ts
+const itemName = parseItemName($, tab);
+if (!itemName) return;
+
+const contentBlock = contentBlocks.eq(index);
+if (contentBlock.length === 0) return;
+
+const table = contentBlock.find('table.wikitable').first();
+if (table.length === 0) return;
+
+parseTable($, table, itemName, icon, result);
+```

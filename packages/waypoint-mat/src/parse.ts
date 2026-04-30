@@ -179,7 +179,6 @@ function parseTable<T extends AnyNode>(
 
 	table.find('tr').each((_, row) => {
 		const cells = parseTableRow($, row);
-
 		if (cells.length === 0) return;
 
 		processRow(cells, rowspanState, itemName, icon, result);
@@ -188,11 +187,9 @@ function parseTable<T extends AnyNode>(
 
 function parseItemName($: CheerioAPI, tab: NodeLike): string {
 	const label = $(tab).find('.wds-tabs__tab-label').first().text().replace(/\s+/g, ' ').trim();
-
 	if (label) return label.toLowerCase();
 
 	const hash = $(tab).attr('data-hash') ?? '';
-
 	return hash.replaceAll('_', ' ').trim().toLowerCase();
 }
 
@@ -206,15 +203,12 @@ export function parseFile(content: string, icon: WaypointIcon): ParseResult {
 
 		tabs.each((index, tab) => {
 			const itemName = parseItemName($, tab);
-
 			if (!itemName) return;
 
 			const contentBlock = contentBlocks.eq(index);
-
 			if (contentBlock.length === 0) return;
 
 			const table = contentBlock.find('table.wikitable').first();
-
 			if (table.length === 0) return;
 
 			parseTable($, table, itemName, icon, result);
