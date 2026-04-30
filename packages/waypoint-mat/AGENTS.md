@@ -1,4 +1,7 @@
-This package parses wikitext data and extracts waypoint information in JSON format.
+This package contains two scripts. 
+
+- Download webpages' html and save it locally
+- Parse the html and extract waypoint information in JSON format
 
 ## Stack
 
