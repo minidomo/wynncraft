@@ -15,5 +15,9 @@
 		"@types/node": "catalog:",
 		"tsx": "catalog:",
 		"typescript": "catalog:"
+	},
+	"dependencies": {
+		"cheerio": "^1.2.0",
+		"domhandler": "^6.0.1"
 	}
 }
