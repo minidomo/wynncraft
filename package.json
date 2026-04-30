@@ -10,6 +10,7 @@
 	"dependencies": {
 		"@biomejs/biome": "catalog:",
 		"@types/node": "catalog:",
+		"playwright": "^1.59.1",
 		"tsx": "catalog:",
 		"typescript": "catalog:"
 	}
