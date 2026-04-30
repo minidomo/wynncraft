@@ -49,10 +49,7 @@ function parseItemNumber(cell: string): number | null {
 	// Indeterminate count like "60+" → no number
 	if (m[2] === '+') return null;
 
-	const digits = m[1];
-	if (digits === undefined) return null;
-
-	return Number.parseInt(digits, 10);
+	return Number.parseInt(m[1], 10);
 }
 
 function processRow(
@@ -68,14 +65,14 @@ function processRow(
 	const freeColumnCount = 5 - rowspanState.filter((slot) => slot.remaining > 0).length;
 	const hasRowspanConflict = cells.length > freeColumnCount;
 
-	const columns: string[] = [];
+	const columns: [string, string, string, string, string] = ['', '', '', '', ''];
 	let cellIdx = 0;
 
 	for (let col = 0; col < 5; col++) {
 		const slot = rowspanState[col];
 
 		if (slot !== undefined && slot.remaining > 0 && !hasRowspanConflict) {
-			columns.push(slot.value);
+			columns[col] = slot.value;
 			slot.remaining--;
 			continue;
 		}
@@ -88,24 +85,21 @@ function processRow(
 
 		if (cell !== undefined) {
 			cellIdx++;
-			columns.push(cell.value);
+			columns[col] = cell.value;
 
 			if (cell.rowspan > 1 && slot !== undefined && !hasRowspanConflict) {
 				slot.value = cell.value;
 				slot.remaining = cell.rowspan - 1;
 			}
 		} else {
-			columns.push('');
+			columns[col] = '';
 		}
 	}
 
 	// Skip empty rows.
 	if (columns.every((c) => !c)) return;
 
-	const territory = columns[0] ?? '';
-	const numberCell = columns[1] ?? '';
-	const coordsCell = columns[3] ?? '';
-	const notesCell = columns[4] ?? '';
+	const [territory, numberCell, , coordsCell, notesCell] = columns;
 
 	const notes = notesCell.trim();
 
