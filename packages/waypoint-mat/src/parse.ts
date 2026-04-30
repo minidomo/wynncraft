@@ -20,43 +20,10 @@ interface RowspanSlot {
 	remaining: number;
 }
 
-function stripTemplates(s: string): string {
-	let prev = '';
-	let current = s;
-
-	while (current !== prev) {
-		prev = current;
-		current = current.replace(/\{\{[^{}]*\}\}/g, '');
-	}
-
-	return current;
-}
-
-function stripWikitext(text: string): string {
-	let s = stripTemplates(text);
-	// [[link|display]] → display
-	s = s.replace(/\[\[[^\]|]*\|([^\]]*)\]\]/g, '$1');
-	// [[link]] → link
-	s = s.replace(/\[\[([^\]]*)\]\]/g, '$1');
-	// '''bold'''
-	s = s.replace(/'''(.*?)'''/g, '$1');
-	// ''italic''
-	s = s.replace(/''(.*?)''/g, '$1');
-	// <big>text</big>
-	s = s.replace(/<big>(.*?)<\/big>/gi, '$1');
-	// <br> variants → space
-	s = s.replace(/<br\s*\/?>/gi, ' ');
-	// Collapse whitespace
-	return s.replace(/\s+/g, ' ').trim();
-}
-
 function parseCoordinates(cell: string): { x: number; y: number; z: number } | null {
 	const trimmed = cell.trim();
 
 	if (!trimmed) return null;
-
-	// Multiple coordinate sets joined by <br> → treat as missing
-	if (/<br/i.test(trimmed)) return null;
 
 	// Uncertain coordinates marked with ? → treat as missing
 	if (trimmed.includes('?')) return null;
@@ -75,11 +42,7 @@ function parseCoordinates(cell: string): { x: number; y: number; z: number } | n
 }
 
 function parseItemNumber(cell: string): number | null {
-	let s = stripTemplates(cell);
-	s = s.replace(/\[\[[^\]|]*\|([^\]]*)\]\]/g, '$1');
-	s = s.replace(/\[\[([^\]]*)\]\]/g, '$1');
-
-	const m = /(\d+)(\+)?/.exec(s);
+	const m = /(\d+)(\+)?/.exec(cell);
 
 	if (m === null) return null;
 
@@ -99,47 +62,44 @@ function processRow(
 	icon: WaypointIcon,
 	result: ParseResult,
 ): void {
-	// Detect overflow: a row supplies more explicit cells than the available free columns.
-	// This happens when wikitext has an incorrect rowspan count and the "spanned" cell
-	// appears explicitly in a row that should have been covered. In that case, explicit
-	// cells take priority and active rowspans are cleared.
-	const activeRowspanCount = rowspanState.filter((s) => s.remaining > 0).length;
-	const isOverflowRow = cells.length > 5 - activeRowspanCount;
+	// Some checked-in HTML rows keep a rowspan active one row too long and then emit
+	// a new explicit cell in the same column. When that happens, prefer the explicit
+	// cells and clear the stale rowspan state for the conflicting row.
+	const freeColumnCount = 5 - rowspanState.filter((slot) => slot.remaining > 0).length;
+	const hasRowspanConflict = cells.length > freeColumnCount;
 
 	const columns: string[] = [];
 	let cellIdx = 0;
 
 	for (let col = 0; col < 5; col++) {
 		const slot = rowspanState[col];
-		const rowspanAvailable = slot !== undefined && slot.remaining > 0;
 
-		if (rowspanAvailable && !isOverflowRow) {
-			// Normal rowspan: consume from state
+		if (slot !== undefined && slot.remaining > 0 && !hasRowspanConflict) {
 			columns.push(slot.value);
 			slot.remaining--;
+			continue;
+		}
+
+		if (slot !== undefined && slot.remaining > 0 && hasRowspanConflict) {
+			slot.remaining = 0;
+		}
+
+		const cell = cells[cellIdx];
+
+		if (cell !== undefined) {
+			cellIdx++;
+			columns.push(cell.value);
+
+			if (cell.rowspan > 1 && slot !== undefined && !hasRowspanConflict) {
+				slot.value = cell.value;
+				slot.remaining = cell.rowspan - 1;
+			}
 		} else {
-			if (rowspanAvailable && isOverflowRow && slot !== undefined) {
-				// Explicit cell overrides the rowspan; clear the stale rowspan state
-				slot.remaining = 0;
-			}
-
-			const cell = cells[cellIdx];
-
-			if (cell !== undefined) {
-				cellIdx++;
-				columns.push(cell.value);
-
-				if (cell.rowspan > 1 && slot !== undefined && !isOverflowRow) {
-					slot.value = cell.value;
-					slot.remaining = cell.rowspan - 1;
-				}
-			} else {
-				columns.push('');
-			}
+			columns.push('');
 		}
 	}
 
-	// Skip artifact rows from double |-
+	// Skip empty rows.
 	if (columns.every((c) => !c)) return;
 
 	const territory = columns[0] ?? '';
@@ -147,9 +107,9 @@ function processRow(
 	const coordsCell = columns[3] ?? '';
 	const notesCell = columns[4] ?? '';
 
-	const notesStripped = stripWikitext(notesCell);
+	const notes = notesCell.trim();
 
-	if (/no longer available/i.test(notesStripped)) return;
+	if (/no longer available/i.test(notes)) return;
 
 	const num = parseItemNumber(numberCell);
 	const name = num !== null ? `${itemName} ${num}` : itemName;
@@ -168,30 +128,26 @@ function processRow(
 	}
 
 	// No valid coordinates → incomplete waypoint
-	const territoryStripped = stripWikitext(territory).trim();
+	const territoryText = territory.trim();
 
 	// Skip rows where territory is empty or a bare hyphen (placeholder)
-	if (!territoryStripped || territoryStripped === '-') return;
+	if (!territoryText || territoryText === '-') return;
 
 	const entry: WaypointIncomplete = {
 		name,
 		color: '#ffffffff',
 		icon,
 		visibility: 'default',
-		territory: territoryStripped,
+		territory: territoryText,
 	};
 
-	if (notesStripped) entry.notes = notesStripped;
+	if (notes) entry.notes = notes;
 
 	result.incomplete.push(entry);
 }
 
 function extractCellText($: CheerioAPI, cell: NodeLike): string {
-	const clone = $(cell).clone();
-
-	clone.find('br').replaceWith('<br>');
-
-	return clone.text().replace(/\s+/g, ' ').trim();
+	return $(cell).text().replace(/\s+/g, ' ').trim();
 }
 
 function parseTableRow($: CheerioAPI, row: NodeLike): CellParseResult[] {
