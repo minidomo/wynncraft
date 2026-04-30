@@ -12,27 +12,28 @@ const iconMap: Record<string, WaypointIcon> = {
 };
 
 const srcDir = dirname(fileURLToPath(import.meta.url));
-const dataDir = resolve(srcDir, '../data/mat');
+const inputDir = resolve(srcDir, '../data/html');
+const outputDir = resolve(srcDir, '../data/mat');
 
 const allComplete: Waypoint[] = [];
 const allIncomplete: WaypointIncomplete[] = [];
 
-const files = await readdir(dataDir);
+const files = await readdir(inputDir);
 
-for (const file of files.filter((f) => f.endsWith('.txt'))) {
-	const stem = file.slice(0, -4);
+for (const file of files.filter((f) => f.endsWith('.html'))) {
+	const stem = file.replace(/ - Wynncraft Wiki\.html$/i, '').toLowerCase();
 	const icon = iconMap[stem];
 
 	if (icon === undefined) continue;
 
-	const content = await readFile(resolve(dataDir, file), 'utf-8');
+	const content = await readFile(resolve(inputDir, file), 'utf-8');
 	const { complete, incomplete } = parseFile(content, icon);
 
 	allComplete.push(...complete);
 	allIncomplete.push(...incomplete);
 }
 
-await writeFile(resolve(dataDir, 'waypoint.mat.json'), `${JSON.stringify(allComplete, null, 4)}\n`);
-await writeFile(resolve(dataDir, 'incomplete.json'), `${JSON.stringify(allIncomplete, null, 4)}\n`);
+await writeFile(resolve(outputDir, 'waypoint.mat.json'), `${JSON.stringify(allComplete, null, 4)}\n`);
+await writeFile(resolve(outputDir, 'incomplete.json'), `${JSON.stringify(allIncomplete, null, 4)}\n`);
 
 console.log(`Written ${allComplete.length} complete and ${allIncomplete.length} incomplete waypoints.`);

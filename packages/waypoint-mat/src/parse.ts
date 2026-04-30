@@ -1,4 +1,9 @@
+import type { Cheerio, CheerioAPI } from 'cheerio';
+import { load } from 'cheerio';
+import type { AnyNode } from 'domhandler';
 import type { Waypoint, WaypointIcon, WaypointIncomplete } from './types.js';
+
+type NodeLike = Parameters<CheerioAPI>[0];
 
 export interface ParseResult {
 	complete: Waypoint[];
@@ -15,7 +20,6 @@ interface RowspanSlot {
 	remaining: number;
 }
 
-// Strip {{...}} templates iteratively to handle adjacent (not nested) templates
 function stripTemplates(s: string): string {
 	let prev = '';
 	let current = s;
@@ -44,53 +48,6 @@ function stripWikitext(text: string): string {
 	s = s.replace(/<br\s*\/?>/gi, ' ');
 	// Collapse whitespace
 	return s.replace(/\s+/g, ' ').trim();
-}
-
-// Attribute strings look like: rowspan="2" align="center" data-sort-value="7" data-sort-type=number
-// They must not contain template or link markers.
-function isAttrString(s: string): boolean {
-	return /^([\w-]+(=["']?[^\s"'|{}[\]]*["']?)?\s*)*$/.test(s.trim());
-}
-
-// Split a table cell's raw content into optional attrs and value,
-// respecting {{ }} and [[ ]] nesting so inner | pipes are not treated as separators.
-function parseCell(cellContent: string): CellParseResult {
-	let braceDepth = 0;
-	let bracketDepth = 0;
-
-	for (let i = 0; i < cellContent.length; i++) {
-		const ch = cellContent[i];
-		const next = cellContent[i + 1];
-
-		if (ch === '{' && next === '{') {
-			braceDepth++;
-			i++;
-		} else if (ch === '}' && next === '}') {
-			if (braceDepth > 0) braceDepth--;
-			i++;
-		} else if (ch === '[' && next === '[') {
-			bracketDepth++;
-			i++;
-		} else if (ch === ']' && next === ']') {
-			if (bracketDepth > 0) bracketDepth--;
-			i++;
-		} else if (ch === '|' && braceDepth === 0 && bracketDepth === 0) {
-			const before = cellContent.slice(0, i).trim();
-
-			if (isAttrString(before)) {
-				const value = cellContent.slice(i + 1).trim();
-				const rowspanMatch = /rowspan="(\d+)"/.exec(before);
-				const rowspan =
-					rowspanMatch !== null && rowspanMatch[1] !== undefined ? Number.parseInt(rowspanMatch[1], 10) : 1;
-
-				return { value, rowspan };
-			}
-
-			break;
-		}
-	}
-
-	return { value: cellContent.trim(), rowspan: 1 };
 }
 
 function parseCoordinates(cell: string): { x: number; y: number; z: number } | null {
@@ -229,68 +186,84 @@ function processRow(
 	result.incomplete.push(entry);
 }
 
-function parseTable(tableContent: string, itemName: string, icon: WaypointIcon, result: ParseResult): void {
+function extractCellText($: CheerioAPI, cell: NodeLike): string {
+	const clone = $(cell).clone();
+
+	clone.find('br').replaceWith('<br>');
+
+	return clone.text().replace(/\s+/g, ' ').trim();
+}
+
+function parseTableRow($: CheerioAPI, row: NodeLike): CellParseResult[] {
+	const cells: CellParseResult[] = [];
+
+	$(row)
+		.children('td')
+		.each((_, cell) => {
+			const rawRowspan = $(cell).attr('rowspan');
+			const parsedRowspan = rawRowspan === undefined ? Number.NaN : Number.parseInt(rawRowspan, 10);
+
+			cells.push({
+				value: extractCellText($, cell),
+				rowspan: Number.isNaN(parsedRowspan) || parsedRowspan < 1 ? 1 : parsedRowspan,
+			});
+		});
+
+	return cells;
+}
+
+function parseTable<T extends AnyNode>(
+	$: CheerioAPI,
+	table: Cheerio<T>,
+	itemName: string,
+	icon: WaypointIcon,
+	result: ParseResult,
+): void {
 	const rowspanState: RowspanSlot[] = Array.from({ length: 5 }, () => ({ value: '', remaining: 0 }));
-	let pendingCells: CellParseResult[] = [];
 
-	const finalizeRow = (): void => {
-		processRow(pendingCells, rowspanState, itemName, icon, result);
-		pendingCells = [];
-	};
+	table.find('tr').each((_, row) => {
+		const cells = parseTableRow($, row);
 
-	for (const line of tableContent.split('\n')) {
-		const trimmed = line.trim();
+		if (cells.length === 0) return;
 
-		if (!trimmed || trimmed.startsWith('{|')) continue;
+		processRow(cells, rowspanState, itemName, icon, result);
+	});
+}
 
-		if (trimmed.startsWith('|}')) {
-			finalizeRow();
-			continue;
-		}
+function parseItemName($: CheerioAPI, tab: NodeLike): string {
+	const label = $(tab).find('.wds-tabs__tab-label').first().text().replace(/\s+/g, ' ').trim();
 
-		if (trimmed.startsWith('|+') || trimmed.startsWith('!')) continue;
+	if (label) return label.toLowerCase();
 
-		if (trimmed.startsWith('|-')) {
-			finalizeRow();
-			continue;
-		}
+	const hash = $(tab).attr('data-hash') ?? '';
 
-		if (trimmed.startsWith('|')) {
-			pendingCells.push(parseCell(trimmed.slice(1)));
-		}
-	}
+	return hash.replaceAll('_', ' ').trim().toLowerCase();
 }
 
 export function parseFile(content: string, icon: WaypointIcon): ParseResult {
 	const result: ParseResult = { complete: [], incomplete: [] };
+	const $ = load(content);
 
-	const tabberStart = content.indexOf('<tabber>');
-	if (tabberStart === -1) return result;
+	$('.tabber.wds-tabber').each((_, tabber) => {
+		const tabs = $(tabber).children('.wds-tabs__wrapper').find('.wds-tabs__tab');
+		const contentBlocks = $(tabber).children('.wds-tab__content');
 
-	const tabberEnd = content.indexOf('</tabber>');
-	const rawTabber =
-		tabberEnd !== -1
-			? content.slice(tabberStart + '<tabber>'.length, tabberEnd)
-			: content.slice(tabberStart + '<tabber>'.length);
+		tabs.each((index, tab) => {
+			const itemName = parseItemName($, tab);
 
-	// Sections are delimited by |-| (MediaWiki tabber syntax)
-	for (const section of rawTabber.split(/^\s*\|-\|\s*$/m)) {
-		// Section header: first line matching "ItemName="
-		const nameMatch = /^([^=\n]+?)=\s*$/m.exec(section);
-		if (nameMatch === null) continue;
+			if (!itemName) return;
 
-		const rawName = nameMatch[1];
-		if (rawName === undefined) continue;
+			const contentBlock = contentBlocks.eq(index);
 
-		const itemName = rawName.trim().toLowerCase();
+			if (contentBlock.length === 0) return;
 
-		const tableStart = section.indexOf('{|');
-		const tableEnd = section.lastIndexOf('|}');
+			const table = contentBlock.find('table.wikitable').first();
 
-		if (tableStart === -1 || tableEnd === -1) continue;
+			if (table.length === 0) return;
 
-		parseTable(section.slice(tableStart, tableEnd + 2), itemName, icon, result);
-	}
+			parseTable($, table, itemName, icon, result);
+		});
+	});
 
 	return result;
 }
