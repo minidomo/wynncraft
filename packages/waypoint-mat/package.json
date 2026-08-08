@@ -4,10 +4,10 @@
 	"description": "",
 	"type": "module",
 	"scripts": {
-		"start": "tsx src/index.ts",
+		"start": "node src/index.ts",
 		"format": "biome check . --write",
-		"build": "tsc",
-		"typecheck": "tsc -p tsconfig.typecheck.json",
+		"build": "tsc -p tsconfig.build.json",
+		"typecheck": "tsc",
 		"test": "vitest run",
 		"test:coverage": "vitest run --coverage"
 	},
@@ -16,7 +16,6 @@
 		"@biomejs/biome": "catalog:",
 		"@types/node": "catalog:",
 		"@vitest/coverage-v8": "^4.1.10",
-		"tsx": "catalog:",
 		"typescript": "catalog:",
 		"vitest": "^4.1.10"
 	},

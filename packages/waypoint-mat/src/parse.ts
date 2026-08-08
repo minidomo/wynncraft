@@ -1,7 +1,7 @@
 import type { Cheerio, CheerioAPI } from 'cheerio';
 import { load } from 'cheerio';
 import type { AnyNode } from 'domhandler';
-import type { Waypoint, WaypointIcon, WaypointIncomplete } from './types.js';
+import type { Waypoint, WaypointIcon, WaypointIncomplete } from './types.ts';
 
 type NodeLike = Parameters<CheerioAPI>[0];
 

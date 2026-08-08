@@ -1,8 +1,8 @@
 import { readdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseFile } from './parse.js';
-import type { Waypoint, WaypointIcon, WaypointIncomplete } from './types.js';
+import { parseFile } from './parse.ts';
+import type { Waypoint, WaypointIcon, WaypointIncomplete } from './types.ts';
 
 const iconMap: Record<string, WaypointIcon> = {
   farming: 'farming',
