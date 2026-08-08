@@ -5,10 +5,10 @@ allowBuilds:
   esbuild: true
 
 catalog:
-  "@biomejs/biome": ^2.4.13
-  "@types/node": ^24.12.2
-  tsx: ^4.21.0
-  typescript: ^6.0.3
+  "@biomejs/biome": ^2.5.7
+  "@types/node": ^24.13.3
+  tsx: ^4.23.8
+  typescript: ^7.0.2
 
 # 3 days
 minimumReleaseAge: 4320
